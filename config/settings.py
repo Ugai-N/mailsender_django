@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'mailsender',
     'crispy_forms',
     'crispy_bootstrap4',
+    'recipients',
 ]
 
 MIDDLEWARE = [

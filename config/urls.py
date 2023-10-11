@@ -20,5 +20,5 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('mailsender.urls', namespace='mailsender')),
-    # path('recipients/', include('recipients.urls', namespace='recipients')),
+    path('recipients/', include('recipients.urls', namespace='recipients')),
 ]
