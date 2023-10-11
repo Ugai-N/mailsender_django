@@ -1,6 +1,19 @@
 from django.contrib import admin
 
 from mailsender.models import Message, Mail, Try
+from recipients.models import Recipient, Category
+
+
+@admin.register(Recipient)
+class RecipientAdmin(admin.ModelAdmin):
+    list_display = ('first_name', 'middle_name', 'last_name', 'email', 'notes',)
+    list_filter = ('category',)
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('title', 'description',)
+    list_filter = ('mail',)
 
 
 @admin.register(Message)

@@ -34,7 +34,7 @@ class Mail(models.Model):
     activity = models.CharField(max_length=100, choices=ACTIVITY_CHOICES, default='draft', verbose_name='активность')
     frequency = models.CharField(max_length=150, choices=FREQUENCY_CHOICES, verbose_name='периодичность', default='ONCE')
     message = models.ForeignKey('Message', on_delete=models.CASCADE, verbose_name='выбрать сообщение')
-    # category = models.ManyToManyField('recipients.Category', verbose_name='категория получателей')
+    category = models.ManyToManyField('recipients.Category', verbose_name='категория получателей')
     created_at = models.DateField(auto_now_add=True, verbose_name='дата создания')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='дата изменения')
 
