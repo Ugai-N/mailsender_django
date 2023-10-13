@@ -33,8 +33,8 @@ def create_try(mail_item):
     emails_list = list(set(emails_list))
 
     try:
-        print(f"recipients:{emails_list}\ntitle:{mail_item.message.title}\nmessage:{mail_item.message.content}")
-        # send_message(emails_list, mail_item.message.title, mail_item.message.content)
+        # print(f"recipients:{emails_list}\ntitle:{mail_item.message.title}\nmessage:{mail_item.message.content}")
+        send_message(emails_list, mail_item.message.title, mail_item.message.content)
         Try.objects.create(mail=mail_item, status=True)
     # except OSError as error:
     except smtplib.SMTPException as error:

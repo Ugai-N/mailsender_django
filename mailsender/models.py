@@ -1,3 +1,4 @@
+import django
 from django.db import models
 from django.utils import timezone
 
@@ -30,7 +31,7 @@ class Mail(models.Model):
     ]
     title = models.CharField(max_length=100, verbose_name='название рассылки')
     time = models.TimeField(verbose_name='время отправки')
-    start_date = models.DateField(verbose_name='дата отправки (старта)', default=timezone.now())
+    start_date = models.DateField(verbose_name='дата отправки (старта)', default=django.utils.timezone.now)
     activity = models.CharField(max_length=100, choices=ACTIVITY_CHOICES, default='draft', verbose_name='активность')
     frequency = models.CharField(max_length=150, choices=FREQUENCY_CHOICES, verbose_name='периодичность', default='ONCE')
     message = models.ForeignKey('Message', on_delete=models.CASCADE, verbose_name='выбрать сообщение')
