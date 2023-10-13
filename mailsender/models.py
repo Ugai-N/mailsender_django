@@ -8,6 +8,7 @@ NULLABLE = {'blank': True, 'null': True}
 class Message(models.Model):
     title = models.CharField(max_length=100, verbose_name='заголовок')
     content = models.TextField(verbose_name='содержание')
+    owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')
 
     def __str__(self):
         return f'{self.title}'
@@ -38,6 +39,7 @@ class Mail(models.Model):
     category = models.ManyToManyField('recipients.Category', verbose_name='категория получателей')
     created_at = models.DateField(auto_now_add=True, verbose_name='дата создания')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='дата изменения')
+    owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')
 
     def __str__(self):
         return f'{self.title}'
@@ -52,6 +54,7 @@ class Try(models.Model):
     error_message = models.TextField(verbose_name='отчет об ошибке', **NULLABLE)
     mail = models.ForeignKey('Mail', on_delete=models.CASCADE, verbose_name='рассылка')
     launched_at = models.DateTimeField(auto_now=True, verbose_name='время запуска')
+    owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')
 
     def __str__(self):
         return f'{self.status}'
