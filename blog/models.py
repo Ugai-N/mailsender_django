@@ -10,13 +10,13 @@ class Article(models.Model):
     created_at = models.DateField(auto_now_add=True, verbose_name='дата_создания')
     slug = models.CharField(max_length=250, verbose_name='slug')
     owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')
-    is_published = models.BooleanField(default=False, verbose_name='опубликовано')
+    is_published = models.BooleanField(default=False)
     published_at = models.DateField(verbose_name='дата_публикации', **NULLABLE)
     views_count = models.IntegerField(default=0, verbose_name='просмотры')
 
     def __str__(self):
         return f'{self.title} ' \
-               f'({self.is_published.verbose_name if self.is_published else "не опубликовано"})'
+               f'({"опубликовано" if self.is_published else "не опубликовано"})'
 
     class Meta:
         verbose_name = 'статья'

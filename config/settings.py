@@ -154,6 +154,8 @@ APSCHEDULER_RUN_NOW_TIMEOUT = 25  # Seconds
 
 # либо в инит.mailsender
 
+#  mailsender/apps -> метод, смотрит в сеттингсах, если Тру - запустит
+
 EMAIL_HOST = 'smtp.yandex.ru'
 EMAIL_PORT = 465
 EMAIL_HOST_USER = os.getenv('EMAIL_USER')
