@@ -67,10 +67,10 @@ class MailCreateView(CreateView):
             form.save()
         return super().form_valid(form)
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs.update({'uid': self.request.user.id})
-        return kwargs
+    # def get_form_kwargs(self):
+    #     kwargs = super().get_form_kwargs()
+    #     kwargs.update({'uid': self.request.user.id})
+    #     return kwargs
 
 
 class MailUpdateView(UpdateView):
@@ -78,10 +78,24 @@ class MailUpdateView(UpdateView):
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
 
+    def form_valid(self, form):
+        pk = self.kwargs.get('pk')
+        scheduler.remove_job(f"{pk}:{self.get_object().title}")
+        if form.is_valid():
+            self.object = form.save()
+            run_APScheduler(job=f"{pk}:{self.object.title}", mail_item=self.object)
+        return super().form_valid(form)
+
 
 class MailDeleteView(DeleteView):
     model = Mail
     success_url = reverse_lazy('mailsender:mail_list')
+
+    def form_valid(self, form):
+        pk = self.kwargs.get('pk')
+        if form.is_valid():
+            scheduler.remove_job(f"{pk}:{self.get_object().title}")
+        return super().form_valid(form)
 
 
 def toggle_mail_activity(request, pk):

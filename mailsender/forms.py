@@ -1,14 +1,15 @@
 from django import forms
 
 from mailsender.models import Mail, Message
+from recipients.models import Category
 
 
 class MailForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        uid = kwargs.pop('uid')
-        super().__init__(*args, **kwargs)
-        self.fields['message'].queryset = Message.objects.all().filter(owner=uid)
-        self.fields['category'].queryset = Message.objects.all().filter(owner=uid)
+    # def __init__(self, *args, **kwargs):
+    #     uid = kwargs.pop('uid')
+    #     super().__init__(*args, **kwargs)
+    #     self.fields['message'].queryset = Message.objects.all().filter(owner=uid)
+    #     self.fields['category'].queryset = Category.objects.all().filter(owner=uid)
 
     class Meta:
         model = Mail
