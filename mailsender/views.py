@@ -67,10 +67,10 @@ class MailCreateView(CreateView):
             form.save()
         return super().form_valid(form)
 
-    # def get_form_kwargs(self):
-    #     kwargs = super().get_form_kwargs()
-    #     kwargs.update({'uid': self.request.user.id})
-    #     return kwargs
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({'uid': self.request.user.id})
+        return kwargs
 
 
 class MailUpdateView(UpdateView):
@@ -85,6 +85,11 @@ class MailUpdateView(UpdateView):
             self.object = form.save()
             run_APScheduler(job=f"{pk}:{self.object.title}", mail_item=self.object)
         return super().form_valid(form)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({'uid': self.request.user.id})
+        return kwargs
 
 
 class MailDeleteView(DeleteView):
