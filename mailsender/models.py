@@ -1,3 +1,5 @@
+import uuid
+
 import django
 from django.db import models
 from django.utils import timezone
@@ -40,6 +42,7 @@ class Mail(models.Model):
     created_at = models.DateField(auto_now_add=True, verbose_name='дата создания')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='дата изменения')
     owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')
+    job_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     def __str__(self):
         return f'{self.title}'

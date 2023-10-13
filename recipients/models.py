@@ -7,7 +7,7 @@ class Recipient(models.Model):
     first_name = models.CharField(max_length=100, verbose_name='имя')
     last_name = models.CharField(max_length=100, verbose_name='фамилия', **NULLABLE)
     middle_name = models.CharField(max_length=100, verbose_name='отчество', **NULLABLE)
-    email = models.EmailField(verbose_name='почта', unique=True)
+    email = models.EmailField(verbose_name='почта')
     notes = models.TextField(verbose_name='комментарий', **NULLABLE)
     category = models.ManyToManyField('Category', verbose_name='категория получателя')
     owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')

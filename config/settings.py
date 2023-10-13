@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'mailsender',
     'recipients',
     'users',
+    'blog',
 ]
 
 MIDDLEWARE = [
@@ -145,6 +146,13 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 APSCHEDULER_DATETIME_FORMAT = 'N j, Y, f:s a'
 APSCHEDULER_RUN_NOW_TIMEOUT = 25  # Seconds
+
+# INSTALLED_APPS = [ ... "django_apscheduler", ]
+# This scheduler config will:
+# - Store jobs in the project database
+# - Execute jobs in threads inside the application process SCHEDULER_CONFIG = { "apscheduler.jobstores.default": { "class": "django_apscheduler.jobstores:DjangoJobStore" }, 'apscheduler.executors.processpool': { "type": "threadpool" }, } SCHEDULER_AUTOSTART = True
+
+# либо в инит.mailsender
 
 EMAIL_HOST = 'smtp.yandex.ru'
 EMAIL_PORT = 465
