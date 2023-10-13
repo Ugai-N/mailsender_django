@@ -51,11 +51,6 @@ class MailListView(ListView):
     model = Mail
 
 
-# NO NEED
-# class MailDetailView(DetailView):
-#     model = Mail
-
-
 class MailCreateView(CreateView):
     model = Mail
     form_class = MailForm
@@ -80,11 +75,12 @@ class MailUpdateView(UpdateView):
 
     def form_valid(self, form):
         pk = self.kwargs.get('pk')
-        scheduler.remove_job(f"{pk}:{self.get_object().title}")
         if form.is_valid():
             self.object = form.save()
-            run_APScheduler(job=f"{pk}:{self.object.title}", mail_item=self.object)
+            run_APScheduler(job=str(self.object.job_id), mail_item=self.object)
         return super().form_valid(form)
+
+# MODIFY: https://apscheduler.readthedocs.io/en/3.x/modules/schedulers/base.html?highlight=modify_job#apscheduler.schedulers.base.BaseScheduler.modify_job
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -99,18 +95,17 @@ class MailDeleteView(DeleteView):
     def form_valid(self, form):
         pk = self.kwargs.get('pk')
         if form.is_valid():
-            scheduler.remove_job(f"{pk}:{self.get_object().title}")
+            scheduler.remove_job(str(self.get_object().job_id))
         return super().form_valid(form)
 
 
 def toggle_mail_activity(request, pk):
     mail_item = get_object_or_404(Mail, pk=pk)
-    job_id = f"{pk}:{mail_item.title}" #или записыватьего в поле мэйл
 
-    try:
-        scheduler.start()
-    except SchedulerAlreadyRunningError:
-        print('Scheduler Already Running')
+    # try:
+    #     scheduler.start()
+    # except SchedulerAlreadyRunningError:
+    #     print('Scheduler Already Running')
     # scheduler.print_jobs()
 
     if mail_item.activity == 'draft':
@@ -134,7 +129,7 @@ def toggle_mail_activity(request, pk):
         #     day = date.day
         # fr_trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} {day} {month} {weekday}')
 
-        run_APScheduler(job=job_id, mail_item=mail_item)
+        run_APScheduler(job=str(mail_item.job_id), mail_item=mail_item)
     ###############################################
     # management.call_command('runapscheduler',
     #                         email=['777ugay@gmail.com'],
@@ -144,12 +139,11 @@ def toggle_mail_activity(request, pk):
     #                         )
     elif mail_item.activity == 'active':
         mail_item.activity = 'paused'
-        # scheduler.remove_job(job_id)
-        scheduler.pause_job(job_id)
+        scheduler.pause_job(str(mail_item.job_id))
 
     elif mail_item.activity == 'paused':
         mail_item.activity = 'active'
-        scheduler.resume_job(job_id)
+        scheduler.resume_job(str(mail_item.job_id))
 
     mail_item.save()
     return redirect(reverse('mailsender:mail_list'))

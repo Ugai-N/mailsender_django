@@ -1,4 +1,5 @@
 import smtplib
+from datetime import timedelta
 
 from apscheduler.schedulers import SchedulerAlreadyRunningError
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -61,11 +62,13 @@ def delete_old_job_executions(max_age=604_800):
 
 def run_APScheduler(job, mail_item):
     day = weekday = month = '*'
+    stop_date = None
     # date = datetime.combine(mail_item.start_date, mail_item.time)
-    if mail_item.frequency == 'ONCE':
+    if mail_item.frequency == 'ONCE': # enddate - ограничение
         month = mail_item.start_date.month
         day = mail_item.start_date.day
         weekday = mail_item.start_date.weekday()
+        stop_date = mail_item.start_date + timedelta(minutes=5)
     elif mail_item.frequency == 'WEEKLY':
         weekday = mail_item.start_date.weekday()
     elif mail_item.frequency == 'MONTHLY':
@@ -80,6 +83,7 @@ def run_APScheduler(job, mail_item):
         id=job,
         max_instances=1,
         replace_existing=True,
+        end_date=stop_date
     )
     logger.info("Added job 'create_log'.")
 

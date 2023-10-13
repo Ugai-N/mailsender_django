@@ -5,3 +5,5 @@ class MailsenderConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'mailsender'
     verbose_name = 'Сервис рассылок'
+
+    #метод, смотрит в сеттингсах, если Тру - запустит
