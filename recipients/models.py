@@ -10,6 +10,7 @@ class Recipient(models.Model):
     email = models.EmailField(verbose_name='почта', unique=True)
     notes = models.TextField(verbose_name='комментарий', **NULLABLE)
     category = models.ManyToManyField('Category', verbose_name='категория получателя')
+    owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')
 
     def __str__(self):
         return f'{self.first_name} {self.last_name} ({self.email})'
@@ -22,6 +23,7 @@ class Recipient(models.Model):
 class Category(models.Model):
     title = models.CharField(max_length=150, verbose_name='наименование')
     description = models.TextField(verbose_name='описание', **NULLABLE)
+    owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')
 
     def __str__(self):
         return f'{self.title}'

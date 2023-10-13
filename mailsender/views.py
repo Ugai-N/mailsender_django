@@ -25,6 +25,12 @@ class MessageCreateView(CreateView):
     # def get_success_url(self):
     #     return reverse('mailsender:message_detail', args=[self.kwargs.get('pk')])
 
+    def form_valid(self, form):
+        if form.is_valid():
+            form.instance.owner = self.request.user
+            form.save()
+        return super().form_valid(form)
+
 
 class MessageUpdateView(UpdateView):
     model = Message
@@ -54,6 +60,17 @@ class MailCreateView(CreateView):
     model = Mail
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
+
+    def form_valid(self, form):
+        if form.is_valid():
+            form.instance.owner = self.request.user
+            form.save()
+        return super().form_valid(form)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({'uid': self.request.user.id})
+        return kwargs
 
 
 class MailUpdateView(UpdateView):
