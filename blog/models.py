@@ -6,7 +6,7 @@ from mailsender.models import NULLABLE
 class Article(models.Model):
     title = models.CharField(max_length=250, verbose_name='заголовок')
     content = models.TextField(verbose_name='содержимое')
-    preview = models.ImageField(verbose_name='превью', **NULLABLE)
+    preview = models.ImageField(upload_to='blog/', verbose_name='превью', **NULLABLE)
     created_at = models.DateField(auto_now_add=True, verbose_name='дата_создания')
     slug = models.CharField(max_length=250, verbose_name='slug')
     owner = models.ForeignKey('users.User', on_delete=models.CASCADE, **NULLABLE, verbose_name='владелец')

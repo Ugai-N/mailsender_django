@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.datetime_safe import datetime
+from pytils.translit import slugify
 
 from blog.models import Article
 from mailsender.models import Message, Mail, Try
@@ -57,6 +58,7 @@ class ArticleAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """автоматически проставляет текущую дату, если поле is_published == True"""
+        obj.slug = slugify(obj.title)
         if obj.is_published:
             obj.published_at = datetime.now()
         super().save_model(request, obj, form, change)

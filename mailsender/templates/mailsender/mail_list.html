@@ -1,17 +1,16 @@
 {% extends 'mailsender/base.html' %}
 {% block content %}
-<div class="container">
-    <div class="row text-start">
-        <div class="row mb-2">
-            <div class="col-12 mb-4">
-                <a class="btn btn-outline-secondary" href="{% url 'mailsender:create_mail' %}">Создать рассылку</a>
-            </div>
-        </div>
+
+<div class="row mb-2">
+    <div class="col-12 mb-4 px-4">
+        <a class="btn btn-outline-secondary" href="{% url 'mailsender:create_mail' %}">Создать рассылку</a>
     </div>
 </div>
+
 <div class="card mb-4">
     <div class="card-body">
-        <table class="table table-striped text-start">
+        <table class="table table-hover text-start">
+            <thead class="table-dark">
             <tr>
                 <th>Название</th>
                 <th>Дата и время</th>
@@ -21,6 +20,7 @@
                 <th>Активность</th>
                 <th>Действия</th>
             </tr>
+            </thead>
             {% for object in object_list %}
             <tr>
                 <td>{{ object.title }}</td>
@@ -31,13 +31,13 @@
                         <div class="accordion-item">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                        data-bs-target="#flush-collapseOne" aria-expanded="false"
-                                        aria-controls="flush-collapseOne">
+                                        data-bs-target="#flush-collapseOne{{object.pk}}" aria-expanded="false"
+                                        aria-controls="flush-collapseOne{{object.pk}}">
                                     {{ object.message.title|truncatechars:10 }}
                                 </button>
                             </h2>
-                            <div id="flush-collapseOne" class="accordion-collapse collapse"
-                                 data-bs-parent="#accordionFlushExample">
+                            <div id="flush-collapseOne{{object.pk}}" class="accordion-collapse collapse"
+                                 data-bs-parent="#accordionFlushExample{{object.pk}}">
                                 <div class="accordion-body">
                                     <strong>Тема: </strong> {{ object.message.title }}<br>
                                     <strong>Текст: </strong> {{ object.message.content }}

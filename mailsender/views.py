@@ -1,11 +1,15 @@
+import random
+
 from apscheduler.schedulers import SchedulerAlreadyRunningError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 
+from blog.models import Article
 from mailsender.forms import MessageForm, MailForm
-from mailsender.models import Message, Mail
+from mailsender.models import Message, Mail, Try
 from mailsender.services import scheduler, run_APScheduler
+from recipients.models import Recipient
 
 
 class MessageListView(ListView):
@@ -49,6 +53,12 @@ class MessageDeleteView(DeleteView):
 class MailListView(ListView):
     paginate_by = 5
     model = Mail
+
+    def get_context_data(self, *args, **kwargs):
+        context_data = super().get_context_data(*args, **kwargs)
+        mails_list = Mail.objects.order_by('updated_at').reverse()
+        context_data['object_list'] = mails_list
+        return context_data
 
 
 class MailCreateView(CreateView):
@@ -147,3 +157,30 @@ def toggle_mail_activity(request, pk):
 
     mail_item.save()
     return redirect(reverse('mailsender:mail_list'))
+
+
+class TryListView(ListView):
+    paginate_by = 5
+    model = Try
+
+    def get_context_data(self, *args, **kwargs):
+        context_data = super().get_context_data(*args, **kwargs)
+        try_list = Try.objects.order_by('launched_at').reverse()
+        context_data['object_list'] = try_list
+        return context_data
+
+
+class IndexView(TemplateView):
+    template_name = 'mailsender/index.html'
+
+    def get_context_data(self,  **kwargs):
+        context_data = super().get_context_data(**kwargs)
+
+        article_list = list(Article.objects.filter(is_published=True))
+        qty = 2 if len(article_list) > 2 else len(article_list)
+        context_data['object_list'] = random.sample(article_list, qty)
+
+        context_data['mail_qty'] = Mail.objects.all().count()
+        context_data['active_mail_qty'] = Mail.objects.filter(activity='active').count()
+        context_data['unique_recipients'] = Recipient.objects.all().values('email').distinct().count()
+        return context_data
