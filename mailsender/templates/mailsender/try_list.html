@@ -18,7 +18,11 @@
             </thead>
             {% for object in object_list %}
             <tr>
-                <td><a class="btn btn-outline-dark text-center" href="{% url 'mailsender:mail_list' %}">{{ object.mail.title }}</a></td>
+                {% if object.status %}
+                <td><a href="{% url 'mailsender:mail_list' %}" class="link-success">{{ object.mail.title }}</a></td>
+                {% else %}
+                <td><a href="{% url 'mailsender:mail_list' %}" class="link-danger">{{ object.mail.title }}</a></td>
+                {% endif %}
                 <td>{{ object.launched_at }}</td>
                 <td>
                     <div class="accordion accordion-flush" id="accordionFlushExample">
