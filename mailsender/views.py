@@ -4,7 +4,7 @@ from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 
 from mailsender.forms import MessageForm, MailForm
-from mailsender.models import Message, Mail
+from mailsender.models import Message, Mail, Try
 from mailsender.services import scheduler, run_APScheduler
 
 
@@ -49,6 +49,12 @@ class MessageDeleteView(DeleteView):
 class MailListView(ListView):
     paginate_by = 5
     model = Mail
+
+    def get_context_data(self, *args, **kwargs):
+        context_data = super().get_context_data(*args, **kwargs)
+        mails_list = Mail.objects.order_by('updated_at').reverse()
+        context_data['object_list'] = mails_list
+        return context_data
 
 
 class MailCreateView(CreateView):
@@ -147,3 +153,14 @@ def toggle_mail_activity(request, pk):
 
     mail_item.save()
     return redirect(reverse('mailsender:mail_list'))
+
+
+class TryListView(ListView):
+    paginate_by = 5
+    model = Try
+
+    def get_context_data(self, *args, **kwargs):
+        context_data = super().get_context_data(*args, **kwargs)
+        try_list = Try.objects.order_by('launched_at').reverse()
+        context_data['object_list'] = try_list
+        return context_data
