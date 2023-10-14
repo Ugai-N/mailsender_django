@@ -87,7 +87,7 @@ class MailUpdateView(UpdateView):
         pk = self.kwargs.get('pk')
         if form.is_valid():
             self.object = form.save()
-            run_APScheduler(job=str(self.object.job_id), mail_item=self.object)
+            run_APScheduler(mail_item=self.object)
         return super().form_valid(form)
 
 # MODIFY: https://apscheduler.readthedocs.io/en/3.x/modules/schedulers/base.html?highlight=modify_job#apscheduler.schedulers.base.BaseScheduler.modify_job
@@ -139,7 +139,7 @@ def toggle_mail_activity(request, pk):
         #     day = date.day
         # fr_trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} {day} {month} {weekday}')
 
-        run_APScheduler(job=str(mail_item.job_id), mail_item=mail_item)
+        run_APScheduler(mail_item=mail_item)
     ###############################################
     # management.call_command('runapscheduler',
     #                         email=['777ugay@gmail.com'],
@@ -150,10 +150,12 @@ def toggle_mail_activity(request, pk):
     elif mail_item.activity == 'active':
         mail_item.activity = 'paused'
         scheduler.pause_job(str(mail_item.job_id))
+        #теряет айдишку после перезапуска сервера
 
     elif mail_item.activity == 'paused':
         mail_item.activity = 'active'
         scheduler.resume_job(str(mail_item.job_id))
+        # теряет айдишку после перезапуска сервера
 
     mail_item.save()
     return redirect(reverse('mailsender:mail_list'))

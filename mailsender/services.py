@@ -1,5 +1,5 @@
 import smtplib
-from datetime import timedelta
+from datetime import timedelta, datetime, date
 
 from apscheduler.schedulers import SchedulerAlreadyRunningError
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -10,7 +10,7 @@ from django_apscheduler import util
 from django_apscheduler.jobstores import DjangoJobStore
 from django_apscheduler.models import DjangoJobExecution
 
-from mailsender.models import Try
+from mailsender.models import Try, Mail
 import logging
 
 logger = logging.getLogger(__name__)
@@ -60,15 +60,21 @@ def delete_old_job_executions(max_age=604_800):
     DjangoJobExecution.objects.delete_old_job_executions(max_age)
 
 
-def run_APScheduler(job, mail_item):
+def run_APScheduler(mail_item):
     day = weekday = month = '*'
     stop_date = None
-    # date = datetime.combine(mail_item.start_date, mail_item.time)
-    if mail_item.frequency == 'ONCE': # enddate - ограничение
+
+    send_datetime = datetime.combine(mail_item.start_date, mail_item.time)
+    if send_datetime <= datetime.now():
+        send_datetime = datetime.now() + timedelta(minutes=5)
+        mail_item.start_date = send_datetime.date()
+        mail_item.time = send_datetime.time()
+
+    if mail_item.frequency == 'ONCE':
         month = mail_item.start_date.month
         day = mail_item.start_date.day
         weekday = mail_item.start_date.weekday()
-        stop_date = mail_item.start_date + timedelta(minutes=5)
+        stop_date = mail_item.start_date + timedelta(hours=1)
     elif mail_item.frequency == 'WEEKLY':
         weekday = mail_item.start_date.weekday()
     elif mail_item.frequency == 'MONTHLY':
@@ -80,7 +86,7 @@ def run_APScheduler(job, mail_item):
         create_try,
         trigger,
         args=[mail_item],
-        id=job,
+        id=str(mail_item.job_id),
         max_instances=1,
         replace_existing=True,
         end_date=stop_date
@@ -107,5 +113,8 @@ def run_APScheduler(job, mail_item):
         logger.info("scheduler is already running!")
     except KeyboardInterrupt:
         logger.info("Stopping scheduler...")
+        # for mail_item in Mail.objects.all():
+        #     mail_item.activity = 'draft'
         scheduler.shutdown()
+
         logger.info("Scheduler shut down successfully!")
