@@ -1,6 +1,9 @@
 import random
 
 from apscheduler.schedulers import SchedulerAlreadyRunningError
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
@@ -12,22 +15,31 @@ from mailsender.services import scheduler, run_APScheduler
 from recipients.models import Recipient
 
 
-class MessageListView(ListView):
+class OwnerRequiredMixin(AccessMixin): #определить для списков!!!!!!!!
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.is_authenticated:
+            if not request.user.is_staff:
+                if request.user.pk != self.get_object().owner.pk:
+                    messages.info(request, 'Изменение и удаление доступно только автору')
+                    return redirect('/users/')
+        return super().dispatch(request, *args, **kwargs)
+
+
+class MessageListView(LoginRequiredMixin, ListView):
     paginate_by = 3
     model = Message
 
 
-class MessageDetailView(DetailView):
+class MessageDetailView(OwnerRequiredMixin, DetailView):
     model = Message
 
 
-class MessageCreateView(CreateView):
+class MessageCreateView(LoginRequiredMixin, CreateView):
     model = Message
     form_class = MessageForm
     success_url = reverse_lazy('mailsender:message_list')
-
-    # def get_success_url(self):
-    #     return reverse('mailsender:message_detail', args=[self.kwargs.get('pk')])
 
     def form_valid(self, form):
         if form.is_valid():
@@ -36,7 +48,7 @@ class MessageCreateView(CreateView):
         return super().form_valid(form)
 
 
-class MessageUpdateView(UpdateView):
+class MessageUpdateView(OwnerRequiredMixin, UpdateView):
     model = Message
     form_class = MessageForm
 
@@ -44,13 +56,12 @@ class MessageUpdateView(UpdateView):
         return reverse('mailsender:message_detail', args=[self.kwargs.get('pk')])
 
 
-class MessageDeleteView(DeleteView):
+class MessageDeleteView(OwnerRequiredMixin, DeleteView):
     model = Message
     success_url = reverse_lazy('mailsender:message_list')
 
 
-# OK
-class MailListView(ListView):
+class MailListView(LoginRequiredMixin, ListView):
     paginate_by = 5
     model = Mail
 
@@ -61,7 +72,7 @@ class MailListView(ListView):
         return context_data
 
 
-class MailCreateView(CreateView):
+class MailCreateView(LoginRequiredMixin, CreateView):
     model = Mail
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
@@ -78,7 +89,7 @@ class MailCreateView(CreateView):
         return kwargs
 
 
-class MailUpdateView(UpdateView):
+class MailUpdateView(OwnerRequiredMixin, UpdateView):
     model = Mail
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
@@ -98,7 +109,7 @@ class MailUpdateView(UpdateView):
         return kwargs
 
 
-class MailDeleteView(DeleteView):
+class MailDeleteView(OwnerRequiredMixin, DeleteView):
     model = Mail
     success_url = reverse_lazy('mailsender:mail_list')
 
@@ -109,6 +120,8 @@ class MailDeleteView(DeleteView):
         return super().form_valid(form)
 
 
+# @OwnerRequiredMixin
+@login_required()
 def toggle_mail_activity(request, pk):
     mail_item = get_object_or_404(Mail, pk=pk)
 
@@ -161,7 +174,7 @@ def toggle_mail_activity(request, pk):
     return redirect(reverse('mailsender:mail_list'))
 
 
-class TryListView(ListView):
+class TryListView(LoginRequiredMixin, ListView):
     paginate_by = 5
     model = Try
 

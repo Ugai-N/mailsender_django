@@ -86,6 +86,7 @@
 
 
 
+
     </style>
 </head>
 <body>
@@ -96,8 +97,9 @@
 </div>
 
 <div class="row">
-{% block content %}
-{% endblock %}
+    {% include 'mailsender/includes/messages.html' %}
+    {% block content %}
+    {% endblock %}
 </div>
 
 <nav aria-label="навигация по страницам">

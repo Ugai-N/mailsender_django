@@ -1,16 +1,18 @@
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 
+from mailsender.views import OwnerRequiredMixin
 from recipients.forms import RecipientForm
 from recipients.models import Recipient
 
 
-class RecipientListView(ListView):
+class RecipientListView(LoginRequiredMixin, ListView):
     model = Recipient
 
 
-class RecipientCreateView(CreateView):
+class RecipientCreateView(LoginRequiredMixin, CreateView):
     model = Recipient
     form_class = RecipientForm
     success_url = reverse_lazy('recipients:list')
@@ -22,12 +24,12 @@ class RecipientCreateView(CreateView):
         return super().form_valid(form)
 
 
-class RecipientUpdateView(UpdateView):
+class RecipientUpdateView(OwnerRequiredMixin, UpdateView):
     model = Recipient
     form_class = RecipientForm
     success_url = reverse_lazy('recipients:list')
 
 
-class RecipientDeleteView(DeleteView):
+class RecipientDeleteView(OwnerRequiredMixin, DeleteView):
     model = Recipient
     success_url = reverse_lazy('recipients:list')
