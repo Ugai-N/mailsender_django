@@ -71,6 +71,14 @@ class MessageDeleteView(OwnerRequiredMixin, DeleteView):
     model = Message
     success_url = reverse_lazy('mailsender:message_list')
 
+    def form_valid(self, form):
+        """При удалении сообщения, удаляем и соответствующую APScheduler job"""
+        if form.is_valid():
+            mail_items = self.object.mail_set.all()
+            for mail_item in mail_items:
+                scheduler.remove_job(str(mail_item.job_id))
+        return super().form_valid(form)
+
 
 class MailListView(LoginRequiredMixin, ListView):
     paginate_by = 5
@@ -116,7 +124,12 @@ class MailUpdateView(OwnerRequiredMixin, UpdateView):
     def form_valid(self, form, *args, **kwargs):
         if form.is_valid():
             self.object = form.save()
-            run_job_update(mail_item=self.object)
+            print(scheduler.get_jobs())
+            if scheduler.get_job(str(self.object.job_id)) is not None:
+                print('scheduler.get_job(str(self.object.job_id))')
+                # run_job_update(mail_item=self.object)
+            else:
+                print('never started the job')
         return super().form_valid(form)
 
     def get_form_kwargs(self):
@@ -139,8 +152,6 @@ class MailDeleteView(OwnerRequiredMixin, DeleteView):
         return super().form_valid(form)
 
 
-# @OwnerRequiredMixin
-# КАК прилепить к обычной функции кастомный миксин по правам доступа????????
 @login_required()
 def toggle_mail_activity(request, pk):
     """Функция для смены статуса рассылки: черновик -> активна -> приостановлена -> активна"""

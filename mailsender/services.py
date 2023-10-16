@@ -62,7 +62,7 @@ def delete_old_job_executions(max_age=604_800):
 
 def get_job_params(mail_item):
     day = weekday = month = '*'
-    stop_date = None
+    stop_datetime = None
 
     send_datetime = datetime.combine(mail_item.start_date, mail_item.time)
     if send_datetime <= datetime.now():
@@ -74,18 +74,18 @@ def get_job_params(mail_item):
         month = mail_item.start_date.month
         day = mail_item.start_date.day
         weekday = mail_item.start_date.weekday()
-        stop_date = mail_item.start_date + timedelta(hours=1)
+        stop_datetime = send_datetime + timedelta(hours=1)
     elif mail_item.frequency == 'WEEKLY':
         weekday = mail_item.start_date.weekday()
     elif mail_item.frequency == 'MONTHLY':
         day = mail_item.start_date.day
     trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} {day} {month} {weekday}')
-    return trigger, stop_date
+    return trigger, stop_datetime
 
 
 def run_APScheduler(mail_item):
     trigger = get_job_params(mail_item)[0]
-    stop_date = get_job_params(mail_item)[1]
+    stop_datetime = get_job_params(mail_item)[1]
     # day = weekday = month = '*'
     # stop_date = None
     #
@@ -114,9 +114,12 @@ def run_APScheduler(mail_item):
         id=str(mail_item.job_id),
         max_instances=1,
         replace_existing=True,
-        end_date=stop_date
+        end_date=stop_datetime
     )
     logger.info("Added job 'create_log'.")
+
+    # if datetime.now() >= stop_datetime + timedelta(minutes=1):
+    #     scheduler.remove_job(str(mail_item.job_id))
 
     scheduler.add_job(
         delete_old_job_executions,
