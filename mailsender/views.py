@@ -1,5 +1,6 @@
 import random
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
@@ -12,6 +13,13 @@ from mailsender.forms import MessageForm, MailForm
 from mailsender.models import Message, Mail, Try
 from mailsender.services import scheduler, run_APScheduler, run_job_update
 from recipients.models import Recipient
+
+if not settings.SCHEDULER_STARTED:
+    try:
+        scheduler.start()
+        settings.SCHEDULER_STARTED = True
+    except KeyboardInterrupt:
+        scheduler.shutdown()
 
 
 class OwnerRequiredMixin(AccessMixin):
@@ -115,21 +123,18 @@ class MailCreateView(LoginRequiredMixin, CreateView):
 
 
 class MailUpdateView(OwnerRequiredMixin, UpdateView):
+    """Функия редактирования рассылки доступна только при неактивном статусе рассылки
+    (регулируется видимостью кнопки в шаблоне)"""
     model = Mail
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
 
-# чтобы все поля были предзаполненными - насильно добавила *args, **kwargs на вход???
-    # здесь должен быть модифай а не ран.!!!!!!!!!
     def form_valid(self, form, *args, **kwargs):
+        """Если рассылка когда-то была запущена и создана job, то апдейтим саму job"""
         if form.is_valid():
             self.object = form.save()
-            print(scheduler.get_jobs())
             if scheduler.get_job(str(self.object.job_id)) is not None:
-                print('scheduler.get_job(str(self.object.job_id))')
-                # run_job_update(mail_item=self.object)
-            else:
-                print('never started the job')
+                run_job_update(mail_item=self.object)
         return super().form_valid(form)
 
     def get_form_kwargs(self):
@@ -146,9 +151,9 @@ class MailDeleteView(OwnerRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         """При удалении рассылки, удаляем и соответствующую APScheduler job"""
-        # pk = self.kwargs.get('pk')
         if form.is_valid():
             scheduler.remove_job(str(self.get_object().job_id))
+            scheduler.remove_job(f"delete_{self.get_object().job_id}")
         return super().form_valid(form)
 
 
@@ -157,12 +162,6 @@ def toggle_mail_activity(request, pk):
     """Функция для смены статуса рассылки: черновик -> активна -> приостановлена -> активна"""
     mail_item = get_object_or_404(Mail, pk=pk)
 
-    # try:
-    #     scheduler.start()
-    # except SchedulerAlreadyRunningError:
-    #     print('Scheduler Already Running')
-    # scheduler.print_jobs()
-
     if mail_item.activity == 'draft':
         mail_item.activity = 'active'
         run_APScheduler(mail_item=mail_item)
@@ -170,12 +169,10 @@ def toggle_mail_activity(request, pk):
     elif mail_item.activity == 'active':
         mail_item.activity = 'paused'
         scheduler.pause_job(str(mail_item.job_id))
-        #теряет айдишку после перезапуска сервера
 
     elif mail_item.activity == 'paused':
         mail_item.activity = 'active'
         scheduler.resume_job(str(mail_item.job_id))
-        # теряет айдишку после перезапуска сервера
 
     mail_item.save()
     return redirect(reverse('mailsender:mail_list'))

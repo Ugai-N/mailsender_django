@@ -157,6 +157,7 @@ SCHEDULER_CONFIG = {
         {"type": "threadpool"},
 }
 SCHEDULER_AUTOSTART = True
+SCHEDULER_STARTED = False
 
 # либо в инит.mailsender
 

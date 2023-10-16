@@ -4,6 +4,7 @@ from datetime import timedelta, datetime, date
 from apscheduler.schedulers import SchedulerAlreadyRunningError
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from django.conf import settings
 from django.core.mail import send_mail
 from django_apscheduler import util
@@ -27,6 +28,7 @@ def send_message(email, title, message):
         recipient_list=email)
 
 
+@util.close_old_connections
 def create_try(mail_item):
     emails_list = []
     for cat in mail_item.category.all():
@@ -34,8 +36,8 @@ def create_try(mail_item):
     emails_list = list(set(emails_list))
 
     try:
-        # print(f"recipients:{emails_list}\ntitle:{mail_item.message.title}\nmessage:{mail_item.message.content}")
-        send_message(emails_list, mail_item.message.title, mail_item.message.content)
+        print(f"recipients:{emails_list}\ntitle:{mail_item.message.title}\nmessage:{mail_item.message.content}")
+        # send_message(emails_list, mail_item.message.title, mail_item.message.content)
         Try.objects.create(mail=mail_item, status=True, owner=mail_item.owner)
     # except OSError as error:
     except smtplib.SMTPException as error:
@@ -48,85 +50,55 @@ def create_try(mail_item):
 
 
 @util.close_old_connections
-def delete_old_job_executions(max_age=604_800):
-    """
-    This job deletes APScheduler job execution entries older than `max_age` from the database.
-    It helps to prevent the database from filling up with old historical records that are no
-    longer useful.
-
-    :param max_age: The maximum length of time to retain historical job execution records.
-                    Defaults to 7 days.
-    """
-    DjangoJobExecution.objects.delete_old_job_executions(max_age)
+def delete_old_job_executions(mail_item):
+    """Удаляет выполненные jobs и возвращает статус черновика рассылке"""
+    scheduler.remove_job(str(mail_item.job_id))
+    print('deleted')
+    mail_item.activity = 'draft'
+    mail_item.save()
+    # DjangoJobExecution.objects.delete_old_job_executions(max_age)
 
 
-def get_job_params(mail_item):
+def get_job_params(mail_item, *new_start_datetime):
+    start_datetime = datetime.combine(mail_item.start_date, mail_item.time)
+
+    if new_start_datetime:
+        start_datetime = new_start_datetime[0]
+
     day = weekday = month = '*'
-    stop_datetime = None
-
-    send_datetime = datetime.combine(mail_item.start_date, mail_item.time)
-    if send_datetime <= datetime.now():
-        send_datetime = datetime.now() + timedelta(minutes=5)
-        mail_item.start_date = send_datetime.date()
-        mail_item.time = send_datetime.time()
 
     if mail_item.frequency == 'ONCE':
-        month = mail_item.start_date.month
-        day = mail_item.start_date.day
-        weekday = mail_item.start_date.weekday()
-        stop_datetime = send_datetime + timedelta(hours=1)
+        month = start_datetime.month
+        day = start_datetime.day
+        weekday = start_datetime.weekday()
+
     elif mail_item.frequency == 'WEEKLY':
-        weekday = mail_item.start_date.weekday()
+        weekday = start_datetime.weekday()
     elif mail_item.frequency == 'MONTHLY':
-        day = mail_item.start_date.day
-    trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} {day} {month} {weekday}')
-    return trigger, stop_datetime
+        day = start_datetime.day
+    trigger = CronTrigger.from_crontab(f'{start_datetime.minute} {start_datetime.hour} {day} {month} {weekday}')
+    return trigger
 
 
-def run_APScheduler(mail_item):
-    trigger = get_job_params(mail_item)[0]
-    stop_datetime = get_job_params(mail_item)[1]
-    # day = weekday = month = '*'
-    # stop_date = None
-    #
-    # send_datetime = datetime.combine(mail_item.start_date, mail_item.time)
-    # if send_datetime <= datetime.now():
-    #     send_datetime = datetime.now() + timedelta(minutes=5)
-    #     mail_item.start_date = send_datetime.date()
-    #     mail_item.time = send_datetime.time()
-    #
-    # if mail_item.frequency == 'ONCE':
-    #     month = mail_item.start_date.month
-    #     day = mail_item.start_date.day
-    #     weekday = mail_item.start_date.weekday()
-    #     stop_date = mail_item.start_date + timedelta(hours=1)
-    # elif mail_item.frequency == 'WEEKLY':
-    #     weekday = mail_item.start_date.weekday()
-    # elif mail_item.frequency == 'MONTHLY':
-    #     day = mail_item.start_date.day
-    # trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} {day} {month} {weekday}')
+def run_APScheduler(mail_item, *new_start_datetime):
+    upd_trigger = get_job_params(mail_item, *new_start_datetime)
 
-    ##########################
     scheduler.add_job(
         create_try,
-        trigger,
+        trigger=upd_trigger,
         args=[mail_item],
         id=str(mail_item.job_id),
         max_instances=1,
         replace_existing=True,
-        end_date=stop_datetime
+        end_date=mail_item.stop_date
     )
     logger.info("Added job 'create_log'.")
 
-    # if datetime.now() >= stop_datetime + timedelta(minutes=1):
-    #     scheduler.remove_job(str(mail_item.job_id))
-
     scheduler.add_job(
         delete_old_job_executions,
-        trigger=CronTrigger(
-            day_of_week="mon", hour="00", minute="00"
-        ),  # Midnight on Monday, before start of the next work week.
-        id="delete_old_job_executions",
+        trigger=DateTrigger(run_date=datetime.combine(mail_item.stop_date, mail_item.time) + timedelta(minutes=5)),
+        args=[mail_item],
+        id=f"delete_{mail_item.job_id}",
         max_instances=1,
         replace_existing=True,
     )
@@ -134,28 +106,19 @@ def run_APScheduler(mail_item):
         "Added weekly job: 'delete_old_job_executions'."
     )
 
-    try:
-        logger.info("Starting scheduler...")
-        scheduler.start()
-    except SchedulerAlreadyRunningError:
-        logger.info("scheduler is already running!")
-    except KeyboardInterrupt:
-        logger.info("Stopping scheduler...")
-        # for mail_item in Mail.objects.all():
-        #     mail_item.activity = 'draft'
-        scheduler.shutdown()
-
-        logger.info("Scheduler shut down successfully!")
-
 
 def run_job_update(mail_item):
-    job_trigger = get_job_params(mail_item)[0]
-    stop_date = get_job_params(mail_item)[1]
-    params = {
-        "trigger": job_trigger,
-        "end_date": stop_date,
-        'args': [mail_item], }
-    scheduler.modify_job(
-        job_id=str(mail_item.job_id),
-        kwargs=params
-    )
+    job_trigger = get_job_params(mail_item)
+
+    # апдейтим аргументы самой job (т.е. все входные аргументы create_try)
+    scheduler.modify_job(job_id=str(mail_item.job_id), args=[mail_item])
+
+    # апдейтим аргументы самой scheduler (т.е. trigger)
+    scheduler.reschedule_job(job_id=str(mail_item.job_id), trigger=job_trigger)
+
+    # рескедьюлим job на удаление (т.е. delete_old_job_executions)
+    scheduler.reschedule_job(job_id=f"delete_{mail_item.job_id}",
+                             trigger=DateTrigger(
+                                 run_date=datetime.combine(mail_item.stop_date, mail_item.time) + timedelta(minutes=5))
+                             )
+

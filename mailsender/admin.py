@@ -28,7 +28,7 @@ class MessageAdmin(admin.ModelAdmin):
 
 @admin.register(Mail)
 class MailAdmin(admin.ModelAdmin):
-    list_display = ('title', 'message', 'start_date', 'time', 'frequency', 'activity', 'job_id', 'created_at', 'updated_at', 'owner',)
+    list_display = ('title', 'message', 'start_date', 'time', 'stop_date', 'frequency', 'activity', 'job_id', 'created_at', 'updated_at', 'owner',)
     list_filter = ('owner', 'activity', 'category', 'message',)
 
 
