@@ -11,6 +11,12 @@ from recipients.models import Recipient
 class RecipientListView(LoginRequiredMixin, ListView):
     model = Recipient
 
+    def get_queryset(self, *args, **kwargs):
+        queryset = super().get_queryset(*args, **kwargs)
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(owner=self.request.user)
+        return queryset
+
 
 class RecipientCreateView(LoginRequiredMixin, CreateView):
     model = Recipient
@@ -18,6 +24,7 @@ class RecipientCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('recipients:list')
 
     def form_valid(self, form):
+        """При создании получателя, записываем автора-пользователя в атрибуты объекта"""
         if form.is_valid():
             form.instance.owner = self.request.user
             form.save()
