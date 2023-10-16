@@ -1,6 +1,8 @@
 import random
 
-from apscheduler.schedulers import SchedulerAlreadyRunningError
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
@@ -8,108 +10,140 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from blog.models import Article
 from mailsender.forms import MessageForm, MailForm
 from mailsender.models import Message, Mail, Try
-from mailsender.services import scheduler, run_APScheduler
+from mailsender.services import scheduler, run_APScheduler, run_job_update
 from recipients.models import Recipient
 
 
-class MessageListView(ListView):
+class OwnerRequiredMixin(AccessMixin):
+    """Кастомный миксин для ограничения прав доступа: при попытке просмотра, изменения или удаления объекта
+    авторизованным пользователем, но не являющимся персоналом или автором объекта:
+    всплывает сообщение об ограничении доступа и происходит переадресация на страницу входа"""
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.is_authenticated:
+            if not request.user.is_staff:
+                if request.user.pk != self.get_object().owner.pk:
+                    messages.info(request, 'Просмотр, изменение и удаление доступно только автору')
+                    return redirect('/users/')
+        return super().dispatch(request, *args, **kwargs)
+
+
+class MessageListView(LoginRequiredMixin, ListView):
     paginate_by = 3
     model = Message
 
+    def get_queryset(self, *args, **kwargs):
+        """Если не персонал, то выводим только принадлежащие автору объекты"""
+        queryset = super().get_queryset(*args, **kwargs)
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(owner=self.request.user)
+        return queryset
 
-class MessageDetailView(DetailView):
+
+class MessageDetailView(OwnerRequiredMixin, DetailView):
     model = Message
 
 
-class MessageCreateView(CreateView):
+class MessageCreateView(LoginRequiredMixin, CreateView):
     model = Message
     form_class = MessageForm
     success_url = reverse_lazy('mailsender:message_list')
 
-    # def get_success_url(self):
-    #     return reverse('mailsender:message_detail', args=[self.kwargs.get('pk')])
-
     def form_valid(self, form):
+        """При создании сообщения, записываем автора-пользователя в атрибуты объекта"""
         if form.is_valid():
             form.instance.owner = self.request.user
             form.save()
         return super().form_valid(form)
 
 
-class MessageUpdateView(UpdateView):
+class MessageUpdateView(OwnerRequiredMixin, UpdateView):
     model = Message
     form_class = MessageForm
 
     def get_success_url(self):
+        """При изменении объекта переадресовываем на просмотр измененного объекта"""
         return reverse('mailsender:message_detail', args=[self.kwargs.get('pk')])
 
 
-class MessageDeleteView(DeleteView):
+class MessageDeleteView(OwnerRequiredMixin, DeleteView):
     model = Message
     success_url = reverse_lazy('mailsender:message_list')
 
 
-# OK
-class MailListView(ListView):
+class MailListView(LoginRequiredMixin, ListView):
     paginate_by = 5
     model = Mail
 
-    def get_context_data(self, *args, **kwargs):
-        context_data = super().get_context_data(*args, **kwargs)
-        mails_list = Mail.objects.order_by('updated_at').reverse()
-        context_data['object_list'] = mails_list
-        return context_data
+    def get_queryset(self, *args, **kwargs):
+        """Если не персонал, то выводим только принадлежащие автору объекты +
+        сортируем по дате обновления (новые - сверху)"""
+        queryset = super().get_queryset(*args, **kwargs)
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(owner=self.request.user)
+        queryset = queryset.order_by('updated_at').reverse()
+        return queryset
 
 
-class MailCreateView(CreateView):
+class MailCreateView(LoginRequiredMixin, CreateView):
     model = Mail
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
 
     def form_valid(self, form):
+        """При создании рассылки, записываем автора-пользователя в атрибуты объекта"""
         if form.is_valid():
             form.instance.owner = self.request.user
             form.save()
         return super().form_valid(form)
 
     def get_form_kwargs(self):
+        """записываем в kwargs self.request.user.id, чтобы потом в MailForm
+        пользователь мог выбрать только те объекты, в которых он является автором"""
         kwargs = super().get_form_kwargs()
         kwargs.update({'uid': self.request.user.id})
         return kwargs
 
 
-class MailUpdateView(UpdateView):
+class MailUpdateView(OwnerRequiredMixin, UpdateView):
     model = Mail
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
 
-    def form_valid(self, form):
-        pk = self.kwargs.get('pk')
+# чтобы все поля были предзаполненными - насильно добавила *args, **kwargs на вход???
+    # здесь должен быть модифай а не ран.!!!!!!!!!
+    def form_valid(self, form, *args, **kwargs):
         if form.is_valid():
             self.object = form.save()
-            run_APScheduler(job=str(self.object.job_id), mail_item=self.object)
+            run_job_update(mail_item=self.object)
         return super().form_valid(form)
 
-# MODIFY: https://apscheduler.readthedocs.io/en/3.x/modules/schedulers/base.html?highlight=modify_job#apscheduler.schedulers.base.BaseScheduler.modify_job
-
     def get_form_kwargs(self):
+        """Также как и в CreateView записываем в kwargs self.request.user.id, чтобы потом в MailForm
+        пользователь мог выбрать только те объекты, в которых он является автором"""
         kwargs = super().get_form_kwargs()
         kwargs.update({'uid': self.request.user.id})
         return kwargs
 
 
-class MailDeleteView(DeleteView):
+class MailDeleteView(OwnerRequiredMixin, DeleteView):
     model = Mail
     success_url = reverse_lazy('mailsender:mail_list')
 
     def form_valid(self, form):
-        pk = self.kwargs.get('pk')
+        """При удалении рассылки, удаляем и соответствующую APScheduler job"""
+        # pk = self.kwargs.get('pk')
         if form.is_valid():
             scheduler.remove_job(str(self.get_object().job_id))
         return super().form_valid(form)
 
 
+# @OwnerRequiredMixin
+# КАК прилепить к обычной функции кастомный миксин по правам доступа????????
+@login_required()
 def toggle_mail_activity(request, pk):
+    """Функция для смены статуса рассылки: черновик -> активна -> приостановлена -> активна"""
     mail_item = get_object_or_404(Mail, pk=pk)
 
     # try:
@@ -120,60 +154,45 @@ def toggle_mail_activity(request, pk):
 
     if mail_item.activity == 'draft':
         mail_item.activity = 'active'
+        run_APScheduler(mail_item=mail_item)
 
-        # if mail_item.frequency == 'ONCE':
-        #     # fr_trigger = DateTrigger(run_date=date)
-        #     month = date.month
-        #     day = date.day
-        #     weekday = date.weekday()
-        # elif mail_item.frequency == 'WEEKLY':
-        #     # fr_trigger = CronTrigger(day="*/7", hour=mail_item.time.hour, minute=mail_item.time.minute, start_date=date)
-        #     # fr_trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} * * {date.weekday()}')
-        #     weekday = date.weekday()
-        # # elif mail_item.frequency == 'DAILY':
-        #     # fr_trigger = CronTrigger(day="*", hour=mail_item.time.hour, minute=mail_item.time.minute, start_date=date)
-        #     # fr_trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} * * *')
-        # elif mail_item.frequency == 'MONTHLY':
-        #     # fr_trigger = CronTrigger(day=1, hour=mail_item.time.hour, minute=mail_item.time.minute, start_date=date)
-        #     # fr_trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} {date.day} * *')
-        #     day = date.day
-        # fr_trigger = CronTrigger.from_crontab(f'{mail_item.time.minute} {mail_item.time.hour} {day} {month} {weekday}')
-
-        run_APScheduler(job=str(mail_item.job_id), mail_item=mail_item)
-    ###############################################
-    # management.call_command('runapscheduler',
-    #                         email=['777ugay@gmail.com'],
-    #                         title=mail_item.message.title,
-    #                         message=mail_item.message.content,
-    #                         trigger=fr_trigger
-    #                         )
     elif mail_item.activity == 'active':
         mail_item.activity = 'paused'
         scheduler.pause_job(str(mail_item.job_id))
+        #теряет айдишку после перезапуска сервера
 
     elif mail_item.activity == 'paused':
         mail_item.activity = 'active'
         scheduler.resume_job(str(mail_item.job_id))
+        # теряет айдишку после перезапуска сервера
 
     mail_item.save()
     return redirect(reverse('mailsender:mail_list'))
 
 
-class TryListView(ListView):
+class TryListView(LoginRequiredMixin, ListView):
     paginate_by = 5
     model = Try
 
-    def get_context_data(self, *args, **kwargs):
-        context_data = super().get_context_data(*args, **kwargs)
-        try_list = Try.objects.order_by('launched_at').reverse()
-        context_data['object_list'] = try_list
-        return context_data
+    def get_queryset(self, *args, **kwargs):
+        """Если не персонал, то выводим только принадлежащие автору объекты +
+        сортируем по дате запуска (новые - сверху)"""
+        queryset = super().get_queryset(*args, **kwargs)
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(owner=self.request.user)
+        queryset = queryset.order_by('launched_at').reverse()
+        return queryset
 
 
 class IndexView(TemplateView):
+    """Контроллер главной страницы"""
     template_name = 'mailsender/index.html'
 
     def get_context_data(self,  **kwargs):
+        """В шаблон подаем 2 статьи (или сколько есть меньше 2),
+         количество всего рассылок в БД,
+         количество активных рассылок в БД,
+         количество уникальных пользователей в БД"""
         context_data = super().get_context_data(**kwargs)
 
         article_list = list(Article.objects.filter(is_published=True))
