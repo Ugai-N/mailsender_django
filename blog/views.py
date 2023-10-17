@@ -8,6 +8,7 @@ class ArticleListView(ListView):
     paginate_by = 2
 
     def get_queryset(self):
+        """Фильтруем только опубликованные"""
         queryset = super().get_queryset()
         queryset = queryset.filter(is_published=True)
         return queryset
@@ -17,15 +18,15 @@ class ArticleDetailView(DetailView):
     model = Article
 
     def get_object(self, queryset=None):
+        """Считаем кол-во просмотров"""
         self.object = super().get_object()
         self.object.views_count += 1
         self.object.save()
         return self.object
 
     def get_context_data(self, **kwargs):
+        """В шаблон подаем 2 статьи (или сколько есть, меньше 2)"""
         context_data = super().get_context_data(**kwargs)
-        # context_to_pass = IndexView.get_context_data(self, **kwargs)
-        # context['object_list'] = context_to_pass['object_list']
         article_list = list(Article.objects.filter(is_published=True))
         qty = 2 if len(article_list) >= 2 else len(article_list)
         context_data['object_list'] = random.sample(article_list, qty)
