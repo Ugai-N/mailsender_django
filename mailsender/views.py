@@ -3,7 +3,7 @@ import random
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
+from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin, PermissionRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
@@ -23,8 +23,23 @@ if not settings.SCHEDULER_STARTED:
 
 
 class OwnerRequiredMixin(AccessMixin):
-    """Кастомный миксин для ограничения прав доступа: при попытке просмотра, изменения или удаления объекта
-    авторизованным пользователем, но не являющимся персоналом или автором объекта:
+    """Кастомный миксин для ограничения прав доступа: при попытке изменения или удаления объекта
+    авторизованным пользователем, но не являющимся Суперюзером или автором объекта:
+    всплывает сообщение об ограничении доступа и происходит переадресация на страницу входа"""
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.is_authenticated:
+            if not request.user.is_superuser:
+                if request.user.pk != self.get_object().owner.pk:
+                    messages.info(request, 'Изменение и удаление доступно только автору')
+                    return redirect('/users/')
+        return super().dispatch(request, *args, **kwargs)
+
+
+class ManagerRequiredMixin(AccessMixin):
+    """Кастомный миксин для ограничения прав доступа: при попытке просмотра объекта
+    авторизованным пользователем, но не являющимся Менеджером или автором объекта:
     всплывает сообщение об ограничении доступа и происходит переадресация на страницу входа"""
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -32,7 +47,7 @@ class OwnerRequiredMixin(AccessMixin):
         if request.user.is_authenticated:
             if not request.user.is_staff:
                 if request.user.pk != self.get_object().owner.pk:
-                    messages.info(request, 'Просмотр, изменение и удаление доступно только автору')
+                    messages.info(request, 'Просмотр доступен только автору')
                     return redirect('/users/')
         return super().dispatch(request, *args, **kwargs)
 
@@ -49,7 +64,7 @@ class MessageListView(LoginRequiredMixin, ListView):
         return queryset
 
 
-class MessageDetailView(OwnerRequiredMixin, DetailView):
+class MessageDetailView(LoginRequiredMixin, ManagerRequiredMixin, DetailView):
     model = Message
 
 
@@ -57,6 +72,7 @@ class MessageCreateView(LoginRequiredMixin, CreateView):
     model = Message
     form_class = MessageForm
     success_url = reverse_lazy('mailsender:message_list')
+    # permission_required = 'mailsender.add_message'
 
     def form_valid(self, form):
         """При создании сообщения, записываем автора-пользователя в атрибуты объекта"""
@@ -158,6 +174,7 @@ class MailDeleteView(OwnerRequiredMixin, DeleteView):
 
 
 @login_required()
+
 def toggle_mail_activity(request, pk):
     """Функция для смены статуса рассылки: черновик -> активна -> приостановлена -> активна"""
     mail_item = get_object_or_404(Mail, pk=pk)
