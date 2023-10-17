@@ -1,5 +1,6 @@
 import random
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
@@ -13,18 +14,42 @@ from mailsender.models import Message, Mail, Try
 from mailsender.services import scheduler, run_APScheduler, run_job_update
 from recipients.models import Recipient
 
+if not settings.SCHEDULER_STARTED:
+    try:
+        scheduler.start()
+        settings.SCHEDULER_STARTED = True
+    except KeyboardInterrupt:
+        scheduler.shutdown()
+
 
 class OwnerRequiredMixin(AccessMixin):
-    """Кастомный миксин для ограничения прав доступа: при попытке просмотра, изменения или удаления объекта
-    авторизованным пользователем, но не являющимся персоналом или автором объекта:
+    """Кастомный миксин для ограничения прав доступа: при попытке изменения или удаления объекта
+    авторизованным пользователем, но не являющимся Суперюзером или автором объекта:
     всплывает сообщение об ограничении доступа и происходит переадресация на страницу входа"""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if request.user.is_authenticated:
+            if not request.user.is_superuser:
+                if request.user.pk != self.get_object().owner.pk:
+                    messages.info(request, 'Изменение и удаление доступно только автору')
+                    return redirect('/users/')
+        return super().dispatch(request, *args, **kwargs)
+
+
+class ManagerRequiredMixin(AccessMixin):
+    """Кастомный миксин для ограничения прав доступа: при попытке просмотра объекта
+    авторизованным пользователем, но не являющимся Менеджером или автором объекта:
+    всплывает сообщение об ограничении доступа и происходит переадресация на страницу входа"""
+
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return self.handle_no_permission()
         if request.user.is_authenticated:
             if not request.user.is_staff:
                 if request.user.pk != self.get_object().owner.pk:
-                    messages.info(request, 'Просмотр, изменение и удаление доступно только автору')
+                    messages.info(request, 'Просмотр доступен только автору')
                     return redirect('/users/')
         return super().dispatch(request, *args, **kwargs)
 
@@ -41,7 +66,7 @@ class MessageListView(LoginRequiredMixin, ListView):
         return queryset
 
 
-class MessageDetailView(OwnerRequiredMixin, DetailView):
+class MessageDetailView(LoginRequiredMixin, ManagerRequiredMixin, DetailView):
     model = Message
 
 
@@ -49,6 +74,8 @@ class MessageCreateView(LoginRequiredMixin, CreateView):
     model = Message
     form_class = MessageForm
     success_url = reverse_lazy('mailsender:message_list')
+
+    # permission_required = 'mailsender.add_message'
 
     def form_valid(self, form):
         """При создании сообщения, записываем автора-пользователя в атрибуты объекта"""
@@ -115,21 +142,18 @@ class MailCreateView(LoginRequiredMixin, CreateView):
 
 
 class MailUpdateView(OwnerRequiredMixin, UpdateView):
+    """Функия редактирования рассылки доступна только при неактивном статусе рассылки
+    (регулируется видимостью кнопки в шаблоне)"""
     model = Mail
     form_class = MailForm
     success_url = reverse_lazy('mailsender:mail_list')
 
-# чтобы все поля были предзаполненными - насильно добавила *args, **kwargs на вход???
-    # здесь должен быть модифай а не ран.!!!!!!!!!
     def form_valid(self, form, *args, **kwargs):
+        """Если рассылка когда-то была запущена и создана job, то апдейтим саму job"""
         if form.is_valid():
             self.object = form.save()
-            print(scheduler.get_jobs())
             if scheduler.get_job(str(self.object.job_id)) is not None:
-                print('scheduler.get_job(str(self.object.job_id))')
-                # run_job_update(mail_item=self.object)
-            else:
-                print('never started the job')
+                run_job_update(mail_item=self.object)
         return super().form_valid(form)
 
     def get_form_kwargs(self):
@@ -146,9 +170,9 @@ class MailDeleteView(OwnerRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         """При удалении рассылки, удаляем и соответствующую APScheduler job"""
-        # pk = self.kwargs.get('pk')
         if form.is_valid():
             scheduler.remove_job(str(self.get_object().job_id))
+            scheduler.remove_job(f"delete_{self.get_object().job_id}")
         return super().form_valid(form)
 
 
@@ -157,12 +181,6 @@ def toggle_mail_activity(request, pk):
     """Функция для смены статуса рассылки: черновик -> активна -> приостановлена -> активна"""
     mail_item = get_object_or_404(Mail, pk=pk)
 
-    # try:
-    #     scheduler.start()
-    # except SchedulerAlreadyRunningError:
-    #     print('Scheduler Already Running')
-    # scheduler.print_jobs()
-
     if mail_item.activity == 'draft':
         mail_item.activity = 'active'
         run_APScheduler(mail_item=mail_item)
@@ -170,12 +188,10 @@ def toggle_mail_activity(request, pk):
     elif mail_item.activity == 'active':
         mail_item.activity = 'paused'
         scheduler.pause_job(str(mail_item.job_id))
-        #теряет айдишку после перезапуска сервера
 
     elif mail_item.activity == 'paused':
         mail_item.activity = 'active'
         scheduler.resume_job(str(mail_item.job_id))
-        # теряет айдишку после перезапуска сервера
 
     mail_item.save()
     return redirect(reverse('mailsender:mail_list'))
@@ -199,7 +215,7 @@ class IndexView(TemplateView):
     """Контроллер главной страницы"""
     template_name = 'mailsender/index.html'
 
-    def get_context_data(self,  **kwargs):
+    def get_context_data(self, **kwargs):
         """В шаблон подаем 2 статьи (или сколько есть меньше 2),
          количество всего рассылок в БД,
          количество активных рассылок в БД,

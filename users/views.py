@@ -13,9 +13,10 @@ class RegisterView(CreateView):
     model = User
     form_class = UserRegisterForm
     template_name = 'users/register.html'
-    success_url = reverse_lazy('mailsender:mail_list')  # можно бы перекинуть на страницу с уведомлением о том, что нужно почту проверить
+    success_url = reverse_lazy('mailsender:mail_list')
 
     def form_valid(self, form):
+        """Формируем код для верификации почты пользователя"""
         if form.is_valid():
             self.object = form.save(commit=False)
             verification_code = secrets.token_urlsafe(nbytes=8)
@@ -26,27 +27,25 @@ class RegisterView(CreateView):
         return super().form_valid(form)
 
 
-# здесь нет никакой страницы, просто выполняется верификация в бэке,
-# а человека редиректит в 'users:login'
-# но тоже бы хорошо всплывающее окно, мол все оки "заходите-проходите"
 def user_verify(request, verification_code):
+    """Функция для верификации почты пользователя. Находим пользователя и меняем его статус на активный"""
     user = User.objects.get(verification_code=verification_code)
     user.is_active = True
     user.save()
     return redirect(reverse('mailsender:mail_list'))
-    # return redirect(reverse('users:login'))
 
 
 class ProfileView(UpdateView):
     model = User
     form_class = UserUpdateForm
-    success_url = reverse_lazy('users:profile')  # уведомление всплывающее
+    success_url = reverse_lazy('users:profile')
 
     def get_object(self, queryset=None):
         return self.request.user
 
 
 def update_password(request):
+    """Формирует новый пароль, обновляет его в базе, вызывает функцию дляотправки кода по почте"""
     if request.method == "POST":
         email = request.POST.get('email')
         DB_user = User.objects.get(email=email)

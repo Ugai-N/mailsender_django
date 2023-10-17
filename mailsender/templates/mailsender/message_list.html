@@ -3,7 +3,9 @@
 
 <div class="row mb-2">
     <div class="col-12 mb-4 px-4">
+        {% if perms.main.add_message %}
         <a class="btn btn-outline-secondary" href="{% url 'mailsender:create_message' %}">Добавить новое сообщение</a>
+        {% endif %}
     </div>
 </div>
 

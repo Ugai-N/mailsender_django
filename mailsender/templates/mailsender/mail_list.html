@@ -12,8 +12,8 @@
         <table class="table table-hover text-start">
             <thead class="table-dark">
             <tr>
-                <th>Название</th>
-                <th>Дата и время</th>
+                <th>Название (создано/изменено)</th>
+                <th>Дата старта/окончания</th>
                 <th>Периодичность</th>
                 <th>Сообщение</th>
                 <th>Получатели</th>
@@ -23,8 +23,8 @@
             </thead>
             {% for object in object_list %}
             <tr>
-                <td>{{ object.title }}</td>
-                <td>{{ object.start_date }} <br> в {{ object.time }}</td>
+                <td>{{ object.title }} <br> {% if object.updated_at %} ({{ object.updated_at}}) {% else %} ({{ object.created_at}}) {% endif %}</td>
+                <td>{{ object.start_date }}{{ object.time }} - <br> {{ object.stop_date }}</td>
                 <td>{{ object.get_frequency_display }}</td>
                 <td>
                     <div class="accordion accordion-flush" id="accordionFlushExample">
@@ -72,8 +72,10 @@
                                 <a href="{% url 'mailsender:toggle_mail_activity' object.pk %}" type="button"
                                    class="btn btn-sm btn-outline-success">Resume</a>
                                 {% endif %}
+                                {% if object.activity != 'active' %}
                                 <a href="{% url 'mailsender:edit_mail' object.pk %}" type="button"
                                    class="btn btn-sm btn-outline-secondary">Edit</a>
+                                {% endif %}
                                 <a href="{% url 'mailsender:delete_mail' object.pk %}" type="button"
                                    class="btn btn-sm btn-outline-danger">Delete</a>
                             </div>

@@ -1,6 +1,6 @@
 from django import forms
 
-from recipients.models import Recipient
+from recipients.models import Recipient, Category
 
 
 class RecipientForm(forms.ModelForm):
@@ -8,3 +8,8 @@ class RecipientForm(forms.ModelForm):
         model = Recipient
         exclude = ('owner',)
 
+
+class CategoryForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        exclude = ('owner',)

@@ -4,6 +4,7 @@ from django.urls import reverse
 
 
 def send_verification_code(verification_code, email):
+    """Отправляет письмо на почту для верификации почты пользователя"""
     url = reverse('users:verification', args=[verification_code])
     send_mail(
         subject='Регистрация на Mailsender',
@@ -14,6 +15,7 @@ def send_verification_code(verification_code, email):
 
 
 def send_new_password(new_password, email):
+    """Отправляет письмо на почту с новым паролем"""
     send_mail(
         subject='Смена пароля на платформе Mailsender',
         message=f'Ваш новый пароль {new_password}',
