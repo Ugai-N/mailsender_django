@@ -2,8 +2,8 @@ from django.urls import path
 
 from mailsender.apps import MailsenderConfig
 from mailsender.views import MessageCreateView, MessageListView, MessageUpdateView, MessageDetailView, \
-    MessageDeleteView, MailCreateView, MailListView, MailUpdateView, MailDeleteView, toggle_mail_activity, TryListView, \
-    IndexView
+    MessageDeleteView, MailCreateView, MailListView, MailUpdateView, MailDeleteView, toggle_mail_activity, \
+    TryListView, IndexView
 
 app_name = MailsenderConfig.name
 urlpatterns = [

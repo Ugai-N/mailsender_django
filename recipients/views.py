@@ -1,5 +1,4 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 
@@ -32,14 +31,14 @@ class RecipientCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-# наверное при редактировании адреса почты нужно модифицировать джобу???
+# рассмотреть на будущее: при редактировании адреса почты - модифицировать джобу
 class RecipientUpdateView(OwnerRequiredMixin, UpdateView):
     model = Recipient
     form_class = RecipientForm
     success_url = reverse_lazy('recipients:list')
 
 
-# наверное при удалении нужно модифицировать джобу???
+# рассмотреть на будущее: при удалении нужно модифицировать джобу
 class RecipientDeleteView(OwnerRequiredMixin, DeleteView):
     model = Recipient
     success_url = reverse_lazy('recipients:list')

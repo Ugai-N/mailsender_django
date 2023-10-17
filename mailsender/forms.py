@@ -30,9 +30,8 @@ class MailForm(forms.ModelForm):
             raise forms.ValidationError('Дата окончания не может быть раньше даты запуска рассылки')
         return cleaned_data
 
-    #
-    # new_message_title = forms.CharField(max_length=100, required=False, label="или СОЗДАТЬ новое сообщение с заголовком:")
-    # new_message_content = forms.CharField(max_length=3000, required=False, label="и содержанием:")
+    # new_message_title = forms.CharField(max_length=100, required=False, label="или СОЗДАТЬ новое сообщение:")
+    # new_message_content = forms.CharField(max_length=3000, required=False, label="c содержанием:")
 
 
 class MessageForm(forms.ModelForm):
